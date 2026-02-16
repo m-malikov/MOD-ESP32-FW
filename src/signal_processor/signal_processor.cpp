@@ -11,6 +11,12 @@
 // MIDI interface
 MIDI_CREATE_INSTANCE(HardwareSerial, Serial2, MIDI);
 
+// USB MIDI interface (via serial bridge at 115200 baud)
+struct UsbSerialSettings {
+    static const long BaudRate = 115200;
+};
+MIDI_CREATE_CUSTOM_INSTANCE(HardwareSerial, Serial, MIDI_USB, UsbSerialSettings);
+
 static SignalProcessor* processor = nullptr;
 
 void handle_note_on(uint8_t channel, uint8_t note, uint8_t velocity) {
@@ -68,6 +74,18 @@ SignalProcessor::SignalProcessor(MidiSettingsState* state)
     MIDI.setHandleStart(::handle_start);
     MIDI.setHandleStop(::handle_stop);
 
+    // Initialize USB MIDI on Serial (UART0)
+    MIDI_USB.begin(MIDI_CHANNEL_OMNI);
+    MIDI_USB.turnThruOff();
+    MIDI_USB.setHandleNoteOn(::handle_note_on);
+    MIDI_USB.setHandleNoteOff(::handle_note_off);
+    MIDI_USB.setHandleControlChange(::handle_cc);
+    MIDI_USB.setHandleAfterTouchChannel(::handle_aftertouch);
+    MIDI_USB.setHandlePitchBend(::handle_pitchbend);
+    MIDI_USB.setHandleClock(::handle_clock);
+    MIDI_USB.setHandleStart(::handle_start);
+    MIDI_USB.setHandleStop(::handle_stop);
+
     // Initialize task handle to nullptr
     midi_task_handle = nullptr;
 
@@ -115,6 +133,7 @@ static SignalProcessor* signal_processor = nullptr;
 
 void updateControl() {
     MIDI.read();
+    MIDI_USB.read();
     if (signal_processor != nullptr) {
         signal_processor->clock_routine();
         // Update osc_enabled based on output types
